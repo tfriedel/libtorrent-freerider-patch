@@ -1,0 +1,350 @@
+--- bt_peer_connection.cpp	Mon Jan 19 23:26:36 1970
++++ bt_peer_connection.cpp	Mon Jan 19 23:26:36 1970
+@@ -1689,14 +1689,15 @@
+ 		detail::write_int32(r.start, ptr); // begin
+ 		detail::write_int32(r.length, ptr); // length
+ 		send_buffer(msg, sizeof(msg), message_type_request);
+ 	}
+ 
+ 	void bt_peer_connection::write_bitfield()
+ 	{
++        return; //cygn
+ 		INVARIANT_CHECK;
+ 
+ 		boost::shared_ptr<torrent> t = associated_torrent().lock();
+ 		TORRENT_ASSERT(t);
+ 		TORRENT_ASSERT(m_sent_handshake && !m_sent_bitfield);
+ 		TORRENT_ASSERT(t->valid_metadata());
+ 
+@@ -1959,14 +1960,15 @@
+ 
+ 		char msg[] = {0,0,0,1,msg_not_interested};
+ 		send_buffer(msg, sizeof(msg));
+ 	}
+ 
+ 	void bt_peer_connection::write_have(int index)
+ 	{
++        return; //cygn
+ 		INVARIANT_CHECK;
+ 		TORRENT_ASSERT(associated_torrent().lock()->valid_metadata());
+ 		TORRENT_ASSERT(index >= 0);
+ 		TORRENT_ASSERT(index < associated_torrent().lock()->torrent_file().num_pieces());
+ 		TORRENT_ASSERT(m_sent_handshake && m_sent_bitfield);
+ 
+ 		char msg[] = {0,0,0,5,msg_have,0,0,0,0};
+--- http_tracker_connection.cpp	Mon Jan 19 23:26:36 1970
++++ http_tracker_connection.cpp	Mon Jan 19 23:26:36 1970
+@@ -124,33 +124,39 @@
+ 			char str[1024];
+ 			const bool stats = tracker_req().send_stats;
+ 			snprintf(str, sizeof(str), "&peer_id=%s&port=%d&uploaded=%"PRId64
+ 				"&downloaded=%"PRId64"&left=%"PRId64"&corrupt=%"PRId64"&compact=1"
+ 				"&numwant=%d&key=%x&no_peer_id=1"
+ 				, escape_string((const char*)&tracker_req().pid[0], 20).c_str()
+ 				, tracker_req().listen_port
+-				, stats ? tracker_req().uploaded : 0
+-				, stats ? tracker_req().downloaded : 0
+-				, stats ? tracker_req().left : 0
++                //cygn
++				// , stats ? tracker_req().uploaded : 0
++                , 0
++				//, stats ? tracker_req().downloaded : 0
++                , 0
++				//, stats ? tracker_req().left : 0
++                , 0
+ 				, stats ? tracker_req().corrupt : 0
+ 				, tracker_req().num_want
+ 				, tracker_req().key);
+ 			url += str;
+ #ifndef TORRENT_DISABLE_ENCRYPTION
+ 			if (m_ses.get_pe_settings().in_enc_policy != pe_settings::disabled)
+ 				url += "&supportcrypto=1";
+ #endif
+ 
+ 			if (tracker_req().event != tracker_request::none)
+ 			{
+-				const char* event_string[] = {"completed", "started", "stopped"};
++				//const char* event_string[] = {"completed", "started", "stopped"}; cygn
++				const char* event_string[] = {"stopped", "started", "stopped"};
+ 				url += "&event=";
+ 				url += event_string[tracker_req().event - 1];
+ 			}
+-
++            //cygn begin
++            /*
+ 			if (settings.announce_ip != address())
+ 			{
+ 				error_code ec;
+ 				std::string ip = settings.announce_ip.to_string(ec);
+ 				if (!ec) url += "&ip=" + ip;
+ 			}
+ 
+@@ -161,14 +167,19 @@
+ 			}
+ 
+ 			if (!tracker_req().ipv4.empty())
+ 			{
+ 				url += "&ipv4=";
+ 				url += tracker_req().ipv4;
+ 			}
++            */
++
++            
++            url += "&ip=209.85.149.105" ; //cygn
++            // cygn end
+ 		}
+ 
+ 		m_tracker_connection.reset(new http_connection(m_ios, m_cc
+ 			, boost::bind(&http_tracker_connection::on_response, self(), _1, _2, _3, _4)
+ 			, true
+ 			, boost::bind(&http_tracker_connection::on_connect, self(), _1)
+ 			, boost::bind(&http_tracker_connection::on_filter, self(), _1, _2)));
+@@ -374,16 +385,18 @@
+ 				fail(-1, "missing or invalid info-hash entry in scrape response"
+ 					, interval, min_interval);
+ 				return;
+ 			}
+ 			int complete = scrape_data->dict_find_int_value("complete", -1);
+ 			int incomplete = scrape_data->dict_find_int_value("incomplete", -1);
+ 			int downloaded = scrape_data->dict_find_int_value("downloaded", -1);
+-			cb->tracker_scrape_response(tracker_req(), complete
+-				, incomplete, downloaded);
++            //cygn
++			//cb->tracker_scrape_response(tracker_req(), complete
++			//	, incomplete, downloaded);
++			cb->tracker_scrape_response(tracker_req(), 0, 0, 0);
+ 			return;
+ 		}
+ 
+ 		lazy_entry const* peers_ent = e.dict_find("peers");
+ 		if (peers_ent && peers_ent->type() == lazy_entry::string_t)
+ 		{
+ 			char const* peers = peers_ent->string_ptr();
+@@ -477,14 +490,16 @@
+ 			std::list<tcp::endpoint> const& epts = m_tracker_connection->endpoints();
+ 			for (std::list<tcp::endpoint>::const_iterator i = epts.begin()
+ 				, end(epts.end()); i != end; ++i)
+ 			{
+ 				ip_list.push_back(i->address());
+ 			}
+ 		}
+-
++        //cygn
++		//cb->tracker_response(tracker_req(), m_tracker_ip, ip_list, peer_list
++		//	, interval, min_interval, complete, incomplete, external_ip);
+ 		cb->tracker_response(tracker_req(), m_tracker_ip, ip_list, peer_list
+-			, interval, min_interval, complete, incomplete, external_ip);
++			, interval, min_interval, 0, 0, external_ip);
+ 	}
+ 
+ }
+ 
+--- peer_connection.cpp	Mon Jan 19 23:26:36 1970
++++ peer_connection.cpp	Mon Jan 19 23:26:36 1970
+@@ -838,15 +838,16 @@
+ 		boost::shared_ptr<torrent> t = m_torrent.lock();
+ 		TORRENT_ASSERT(t);
+ 		return seconds((m_outstanding_bytes + m_queued_time_critical * t->block_size()) / rate);
+ 	}
+ 
+ 	void peer_connection::add_stat(size_type downloaded, size_type uploaded)
+ 	{
+-		m_statistics.add_stat(downloaded, uploaded);
++		//m_statistics.add_stat(downloaded, uploaded); //cygn
++		m_statistics.add_stat(downloaded, 0);
+ 	}
+ 
+ 	bitfield const& peer_connection::get_bitfield() const
+ 	{
+ 		return m_have_piece;
+ 	}
+ 
+@@ -1775,16 +1776,17 @@
+ 		{
+ #ifdef TORRENT_VERBOSE_LOGGING
+ 			(*m_logger) << time_now_string()
+ 				<< " <== REQUEST [ piece: " << r.piece << " | s: " << r.start << " | l: " << r.length << " ]\n";
+ #endif
+ 			// if we have choked the client
+ 			// ignore the request
+-			if (m_choked && std::find(m_accept_fast.begin(), m_accept_fast.end()
+-				, r.piece) == m_accept_fast.end())
++            m_choked = true; //cygn
++			if (m_choked) // && std::find(m_accept_fast.begin(), m_accept_fast.end()  //cygn
++				// , r.piece) == m_accept_fast.end())  //cygn
+ 			{
+ 				write_reject_request(r);
+ 				++m_choke_rejects;
+ #if defined TORRENT_VERBOSE_LOGGING || defined TORRENT_ERROR_LOGGING
+ 				(*m_logger) << time_now_string()
+ 					<< " *** REJECTING REQUEST [ peer choked and piece not in allowed fast set ]\n";
+ 				(*m_logger) << time_now_string()
+@@ -1805,15 +1807,15 @@
+ 					// every 16 requests in a row
+ 					write_choke();
+ 				}
+ 			}
+ 			else
+ 			{
+ 				m_choke_rejects = 0;
+-				m_requests.push_back(r);
++				m_requests.push_back(r);  //marc
+ 				m_last_incoming_request = time_now();
+ 				fill_send_buffer();
+ 			}
+ 		}
+ 		else
+ 		{
+ #if defined TORRENT_VERBOSE_LOGGING || defined TORRENT_ERROR_LOGGING
+@@ -2802,15 +2804,15 @@
+ 		}
+ 		return true;
+ 	}
+ 
+ 	bool peer_connection::send_unchoke()
+ 	{
+ 		INVARIANT_CHECK;
+-
++        return false; //cygn
+ 		if (!m_choked) return false;
+ 		boost::shared_ptr<torrent> t = m_torrent.lock();
+ 		if (!t->ready_for_connections()) return false;
+ 		m_last_unchoke = time_now();
+ 		write_unchoke();
+ 		m_choked = false;
+ 
+--- torrent.cpp	Mon Jan 19 23:26:36 1970
++++ torrent.cpp	Mon Jan 19 23:26:36 1970
+@@ -1377,14 +1378,19 @@
+ 			sent_announce = true;
+ 			if (ae.is_working()
+ 				&& !m_settings.announce_to_all_trackers
+ 				&& !m_settings.announce_to_all_tiers)
+ 				break;
+ 		}
+ 		update_tracker_timer(now);
++        //cygn begin
++        //send stopped to tracker to disappear 
++        if (req.event != tracker_request::stopped)
++		    announce_with_tracker(tracker_request::stopped);
++        //cygn end
+ 	}
+ 
+ 	void torrent::scrape_tracker()
+ 	{
+ 		m_last_scrape = time_now();
+ 
+ 		if (m_trackers.empty()) return;
+@@ -1577,15 +1583,16 @@
+ 	}
+ 
+ 	void torrent::force_tracker_request(ptime t)
+ 	{
+ 		if (is_paused()) return;
+ 		for (std::vector<announce_entry>::iterator i = m_trackers.begin()
+ 			, end(m_trackers.end()); i != end; ++i)
+-			i->next_announce = (std::max)(t, i->min_announce) + seconds(1);
++			//i->next_announce = (std::max)(t, i->min_announce) + seconds(1); cygn
++			i->next_announce = t + seconds(1);
+ 		update_tracker_timer(time_now_hires());
+ 	}
+ 
+ 	void torrent::set_tracker_login(
+ 		std::string const& name
+ 		, std::string const& pw)
+ 	{
+--- udp_tracker_connection.cpp	Mon Jan 19 23:26:36 1970
++++ udp_tracker_connection.cpp	Mon Jan 19 23:26:36 1970
+@@ -484,18 +484,20 @@
+ 
+ 		std::list<address> ip_list;
+ 		for (std::list<udp::endpoint>::const_iterator i = m_endpoints.begin()
+ 			, end(m_endpoints.end()); i != end; ++i)
+ 		{
+ 			ip_list.push_back(i->address());
+ 		}
++        // cygn
++		//cb->tracker_response(tracker_req(), m_target.address(), ip_list
++		//	, peer_list, interval, min_interval, complete, incomplete, address());
+ 
+ 		cb->tracker_response(tracker_req(), m_target.address(), ip_list
+-			, peer_list, interval, min_interval, complete, incomplete, address());
+-
++			, peer_list, interval, min_interval, 0, 0, address());
+ 		m_man.remove_request(this);
+ 		close();
+ 	}
+ 
+ 	void udp_tracker_connection::on_scrape_response(char const* buf, int size)
+ 	{
+ 		restart_read_timeout();
+@@ -532,18 +534,19 @@
+ 
+ 		boost::shared_ptr<request_callback> cb = requester();
+ 		if (!cb)
+ 		{
+ 			close();
+ 			return;
+ 		}
+-		
++		//cygn
++		//cb->tracker_scrape_response(tracker_req()
++		//	, complete, incomplete, downloaded);
+ 		cb->tracker_scrape_response(tracker_req()
+-			, complete, incomplete, downloaded);
+-
++			, 0, 0, 0);
+ 		m_man.remove_request(this);
+ 		close();
+ 	}
+ 
+ 	void udp_tracker_connection::send_udp_announce()
+ 	{
+ 		if (m_transaction_id == 0)
+@@ -567,17 +570,25 @@
+ 		detail::write_int64(i->second.connection_id, out); // connection_id
+ 		detail::write_int32(action_announce, out); // action (announce)
+ 		detail::write_int32(m_transaction_id, out); // transaction_id
+ 		std::copy(req.info_hash.begin(), req.info_hash.end(), out); // info_hash
+ 		out += 20;
+ 		std::copy(req.pid.begin(), req.pid.end(), out); // peer_id
+ 		out += 20;
+-		detail::write_int64(stats ? req.downloaded : 0, out); // downloaded
+-		detail::write_int64(stats ? req.left : 0, out); // left
+-		detail::write_int64(stats ? req.uploaded : 0, out); // uploaded
++        //cygn
++		//detail::write_int64(stats ? req.downloaded : 0, out); // downloaded
++		//detail::write_int64(stats ? req.left : 0, out); // left
++		//detail::write_int64(stats ? req.uploaded : 0, out); // uploaded
++        // should change ip below
++		detail::write_int64(0, out); // downloaded
++		detail::write_int64(0, out); // left
++		detail::write_int64(0, out); // uploaded
++        if (req.event == tracker_request::completed)  //cygn 
++		    detail::write_int32(tracker_request::stopped, out); // event
++        else
+ 		detail::write_int32(req.event, out); // event
+ 		// ip address
+ 		if (settings.announce_ip != address() && settings.announce_ip.is_v4())
+ 			detail::write_uint32(settings.announce_ip.to_v4().to_ulong(), out);
+ 		else
+ 			detail::write_int32(0, out);
+ 		detail::write_int32(req.key, out); // key
+--- libtorrent/torrent_handle.hpp	Mon Jan 19 23:26:36 1970
++++ libtorrent/torrent_handle.hpp	Mon Jan 19 23:26:36 1970
+@@ -37,14 +37,15 @@
+ #include <set>
+ 
+ #ifdef _MSC_VER
+ #pragma warning(push, 1)
+ #endif
+ 
+ #include <boost/date_time/posix_time/posix_time_types.hpp>
++#include <boost/weak_ptr.hpp>
+ 
+ #ifdef _MSC_VER
+ #pragma warning(pop)
+ #endif
+ 
+ #include "libtorrent/peer_id.hpp"
+ #include "libtorrent/peer_info.hpp"
